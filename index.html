@@ -840,7 +840,7 @@
                 <h2>Precision Tailoring for Men</h2>
                 <p>From boardroom to wedding day — every garment is crafted with attention to detail</p>
             </div>
-            <div class="services-grid">
+            <div class="services-grid" id="servicesGrid">
                 <div class="service-card">
                     <div class="service-img">
                         <img src="https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=700&q=80" alt="Men's Suits" loading="lazy">
@@ -880,7 +880,7 @@
                 <h2>Men's Tailoring Gallery</h2>
                 <p>A selection of suits, formal wear and ethnic pieces crafted for our clients</p>
             </div>
-            <div class="gallery-grid">
+            <div class="gallery-grid" id="galleryGrid">
                 <div class="gallery-item">
                     <img src="https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=700&q=80" alt="Premium Suit" loading="lazy">
                     <div class="gallery-overlay">
@@ -1089,6 +1089,49 @@
         navLinks.querySelectorAll('a').forEach(link => {
             link.addEventListener('click', () => navLinks.classList.remove('active'));
         });
+    </script>
+    <script type="module">
+        import { db } from "./js/firebase-config.js";
+        import { collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        async function loadGallery() {
+            const grid = document.getElementById('galleryGrid');
+            const snap = await getDocs(query(collection(db, 'gallery'), orderBy('createdAt', 'desc')));
+            if (snap.empty) return; // keep default hardcoded items
+            grid.innerHTML = '';
+            snap.forEach(doc => {
+                const d = doc.data();
+                grid.insertAdjacentHTML('beforeend', `
+                    <div class="gallery-item">
+                        <img src="${d.imageUrl}" alt="${d.title || ''}" loading="lazy">
+                        <div class="gallery-overlay">
+                            <h4>${d.title || ''}</h4>
+                            <span>${d.subtitle || ''}</span>
+                        </div>
+                    </div>`);
+            });
+        }
+
+        async function loadServices() {
+            const grid = document.getElementById('servicesGrid');
+            const snap = await getDocs(query(collection(db, 'services'), orderBy('createdAt', 'desc')));
+            if (snap.empty) return; // keep default hardcoded items
+            grid.innerHTML = '';
+            snap.forEach(doc => {
+                const d = doc.data();
+                grid.insertAdjacentHTML('beforeend', `
+                    <div class="service-card">
+                        <div class="service-img"><img src="${d.imageUrl}" alt="${d.title || ''}" loading="lazy"></div>
+                        <div class="service-body">
+                            <h3>${d.title || ''}</h3>
+                            <p>${d.description || ''}</p>
+                        </div>
+                    </div>`);
+            });
+        }
+
+        loadGallery();
+        loadServices();
     </script>
 </body>
 </html>

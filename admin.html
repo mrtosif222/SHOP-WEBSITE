@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin | ACTION TAILOR</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#0b1c2c;--maroon:#8b1e3f;--maroon-hover:#a0284c;--gold:#c9a84c;--off-white:#f7f8fa;--text:#1a1a1a;--grey:#6b7785;--radius:8px;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Roboto',sans-serif;background:var(--off-white);color:var(--text);}
+  h1,h2,h3{font-family:'Montserrat',sans-serif;color:var(--navy);}
+  .wrap{max-width:900px;margin:0 auto;padding:30px 20px 80px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;}
+  .topbar h1{font-size:22px;}
+  .btn{background:var(--maroon);color:#fff;border:none;padding:10px 18px;border-radius:var(--radius);cursor:pointer;font-weight:500;font-size:14px;}
+  .btn:hover{background:var(--maroon-hover);}
+  .btn-outline{background:transparent;border:1px solid var(--maroon);color:var(--maroon);}
+  .card{background:#fff;border-radius:var(--radius);padding:24px;box-shadow:0 4px 20px rgba(11,28,44,.08);margin-bottom:24px;}
+  label{display:block;font-size:13px;color:var(--grey);margin:12px 0 4px;}
+  input,textarea{width:100%;padding:10px;border:1px solid #dfe3e8;border-radius:6px;font-family:inherit;font-size:14px;}
+  textarea{resize:vertical;min-height:60px;}
+  #loginBox{max-width:360px;margin:80px auto;}
+  .item-row{display:flex;gap:14px;align-items:center;border-bottom:1px solid #eee;padding:12px 0;}
+  .item-row img{width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+  .item-row .info{flex:1;}
+  .item-row .info h4{font-size:15px;}
+  .item-row .info p{font-size:13px;color:var(--grey);}
+  .item-row button{background:none;border:none;color:var(--maroon);cursor:pointer;font-size:13px;font-weight:500;margin-left:8px;}
+  .hidden{display:none;}
+  .msg{font-size:13px;margin-top:8px;}
+  .msg.error{color:var(--maroon);}
+  .msg.ok{color:#2a7d46;}
+  section h2{font-size:18px;margin-bottom:14px;border-left:3px solid var(--gold);padding-left:10px;}
+</style>
+</head>
+<body>
+
+<div id="loginBox" class="card">
+  <h1 style="margin-bottom:16px;">Admin Login</h1>
+  <label>Email</label>
+  <input type="email" id="loginEmail" placeholder="you@example.com">
+  <label>Password</label>
+  <input type="password" id="loginPassword" placeholder="••••••••">
+  <button class="btn" id="loginBtn" style="margin-top:18px;width:100%;">Login</button>
+  <p class="msg error" id="loginMsg"></p>
+</div>
+
+<div id="panel" class="wrap hidden">
+  <div class="topbar">
+    <h1>ACTION TAILOR — Admin Panel</h1>
+    <button class="btn btn-outline" id="logoutBtn">Logout</button>
+  </div>
+
+  <section class="card">
+    <h2>Add Gallery Photo</h2>
+    <label>Image URL (upload photo on imgbb.com first, paste link here)</label>
+    <input type="url" id="galImageUrl" placeholder="https://i.ibb.co/xxxxx/photo.jpg">
+    <label>Title</label>
+    <input type="text" id="galTitle" placeholder="e.g. Premium Suit">
+    <label>Subtitle</label>
+    <input type="text" id="galSubtitle" placeholder="e.g. 2-Piece Formal">
+    <button class="btn" id="galAddBtn" style="margin-top:16px;">Add to Gallery</button>
+    <p class="msg" id="galMsg"></p>
+  </section>
+
+  <section class="card">
+    <h2>Current Gallery Photos</h2>
+    <div id="galleryList"></div>
+  </section>
+
+  <section class="card">
+    <h2>Add Service</h2>
+    <label>Image URL</label>
+    <input type="url" id="svcImageUrl" placeholder="https://i.ibb.co/xxxxx/photo.jpg">
+    <label>Title</label>
+    <input type="text" id="svcTitle" placeholder="e.g. Men's Suits">
+    <label>Description</label>
+    <textarea id="svcDescription" placeholder="Short description of the service"></textarea>
+    <button class="btn" id="svcAddBtn" style="margin-top:16px;">Add Service</button>
+    <p class="msg" id="svcMsg"></p>
+  </section>
+
+  <section class="card">
+    <h2>Current Services</h2>
+    <div id="servicesList"></div>
+  </section>
+</div>
+
+<script type="module">
+import { auth, db } from "./js/firebase-config.js";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { collection, addDoc, deleteDoc, doc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const loginBox = document.getElementById('loginBox');
+const panel = document.getElementById('panel');
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    loginBox.classList.add('hidden');
+    panel.classList.remove('hidden');
+    loadGalleryList();
+    loadServicesList();
+  } else {
+    loginBox.classList.remove('hidden');
+    panel.classList.add('hidden');
+  }
+});
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const msg = document.getElementById('loginMsg');
+  msg.textContent = '';
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (e) {
+    msg.textContent = 'Login failed: check email/password.';
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+
+// ---- Gallery ----
+document.getElementById('galAddBtn').addEventListener('click', async () => {
+  const imageUrl = document.getElementById('galImageUrl').value.trim();
+  const title = document.getElementById('galTitle').value.trim();
+  const subtitle = document.getElementById('galSubtitle').value.trim();
+  const msg = document.getElementById('galMsg');
+  if (!imageUrl) { msg.textContent = 'Image URL required.'; msg.className = 'msg error'; return; }
+  try {
+    await addDoc(collection(db, 'gallery'), { imageUrl, title, subtitle, createdAt: serverTimestamp() });
+    document.getElementById('galImageUrl').value = '';
+    document.getElementById('galTitle').value = '';
+    document.getElementById('galSubtitle').value = '';
+    msg.textContent = 'Added!'; msg.className = 'msg ok';
+    loadGalleryList();
+  } catch (e) {
+    msg.textContent = 'Error: ' + e.message; msg.className = 'msg error';
+  }
+});
+
+async function loadGalleryList() {
+  const list = document.getElementById('galleryList');
+  list.innerHTML = 'Loading...';
+  const snap = await getDocs(query(collection(db, 'gallery'), orderBy('createdAt', 'desc')));
+  list.innerHTML = '';
+  if (snap.empty) { list.innerHTML = '<p style="color:var(--grey);font-size:14px;">No photos yet — site is showing default images.</p>'; return; }
+  snap.forEach(d => {
+    const data = d.data();
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `<img src="${data.imageUrl}"><div class="info"><h4>${data.title || ''}</h4><p>${data.subtitle || ''}</p></div><button data-id="${d.id}">Delete</button>`;
+    row.querySelector('button').addEventListener('click', async () => {
+      if (confirm('Delete this photo?')) { await deleteDoc(doc(db, 'gallery', d.id)); loadGalleryList(); }
+    });
+    list.appendChild(row);
+  });
+}
+
+// ---- Services ----
+document.getElementById('svcAddBtn').addEventListener('click', async () => {
+  const imageUrl = document.getElementById('svcImageUrl').value.trim();
+  const title = document.getElementById('svcTitle').value.trim();
+  const description = document.getElementById('svcDescription').value.trim();
+  const msg = document.getElementById('svcMsg');
+  if (!imageUrl || !title) { msg.textContent = 'Image URL and title required.'; msg.className = 'msg error'; return; }
+  try {
+    await addDoc(collection(db, 'services'), { imageUrl, title, description, createdAt: serverTimestamp() });
+    document.getElementById('svcImageUrl').value = '';
+    document.getElementById('svcTitle').value = '';
+    document.getElementById('svcDescription').value = '';
+    msg.textContent = 'Added!'; msg.className = 'msg ok';
+    loadServicesList();
+  } catch (e) {
+    msg.textContent = 'Error: ' + e.message; msg.className = 'msg error';
+  }
+});
+
+async function loadServicesList() {
+  const list = document.getElementById('servicesList');
+  list.innerHTML = 'Loading...';
+  const snap = await getDocs(query(collection(db, 'services'), orderBy('createdAt', 'desc')));
+  list.innerHTML = '';
+  if (snap.empty) { list.innerHTML = '<p style="color:var(--grey);font-size:14px;">No services yet — site is showing default services.</p>'; return; }
+  snap.forEach(d => {
+    const data = d.data();
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `<img src="${data.imageUrl}"><div class="info"><h4>${data.title || ''}</h4><p>${data.description || ''}</p></div><button data-id="${d.id}">Delete</button>`;
+    row.querySelector('button').addEventListener('click', async () => {
+      if (confirm('Delete this service?')) { await deleteDoc(doc(db, 'services', d.id)); loadServicesList(); }
+    });
+    list.appendChild(row);
+  });
+}
+</script>
+</body>
+</html>
